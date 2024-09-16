@@ -1,3 +1,5 @@
+const db = require('../../data/db-config')
+
 function find() { // EXERCISE A
   /*
     1A- Study the SQL query below running it in SQLite Studio against `data/schemes.db3`.
@@ -15,9 +17,15 @@ function find() { // EXERCISE A
     2A- When you have a grasp on the query go ahead and build it in Knex.
     Return from this function the resulting dataset.
   */
+    return db('schemes as sc')
+      .leftJoin('steps as st', 'sc.scheme_id', 'st.scheme_id')
+      .select('sc.*')
+      .count('st.step_id as number_of_steps')
+      .groupBy('sc.scheme_id')
+      .orderBy('sc.scheme_id', 'ASC')
 }
 
-function findById(scheme_id) { // EXERCISE B
+async function findById(scheme_id) { // EXERCISE B
   /*
     1B- Study the SQL query below running it in SQLite Studio against `data/schemes.db3`:
 
@@ -83,9 +91,32 @@ function findById(scheme_id) { // EXERCISE B
         "steps": []
       }
   */
+
+      // const schemeData = await db('schemes as sc')
+      // .leftJoin('steps as st', 'sc.scheme_id', 'st.scheme_id')
+      // .select('sc.scheme_id', 'sc.scheme_name', 'st.*')
+      // .where('sc.scheme_id', scheme_id)
+      // .orderBy('st.step_number', 'asc')
+      // if(schemeData.step_number >= 1){
+
+      // }
+      const schemeObj = await db('schemes as sc')
+        .where('sc.scheme_id', scheme_id)
+        .first();
+        const steps = await findIdHelper(scheme_id);
+        schemeObj.steps = steps
+      return schemeObj
 }
 
-function findSteps(scheme_id) { // EXERCISE C
+async function findIdHelper (scheme_id) {
+  const stepsArray = await db('steps as st')
+  .where('st.scheme_id', scheme_id)
+  .select('step_id', "step_number", "instructions")
+  .orderBy('step_number', 'asc');
+  return stepsArray
+} 
+
+async function findSteps (scheme_id) { // EXERCISE C
   /*
     1C- Build a query in Knex that returns the following data.
     The steps should be sorted by step_number, and the array
@@ -106,20 +137,39 @@ function findSteps(scheme_id) { // EXERCISE C
         }
       ]
   */
+ const stepsArray = await db('schemes as sc')
+      .leftJoin('steps as st', 'sc.scheme_id', 'st.scheme_id')
+      .where('sc.scheme_id', scheme_id)
+      .select('st.step_id', "st.step_number", "st.instructions", 'sc.scheme_name')
+      .orderBy('st.step_number', 'asc');
+  
+      if(!stepsArray[0].step_id){
+        return []
+      } else {
+        return stepsArray
+      }
 }
 
-function add(scheme) { // EXERCISE D
+async function add(scheme) { // EXERCISE D
   /*
     1D- This function creates a new scheme and resolves to _the newly created scheme_.
   */
+  const [scheme_id] = await db('schemes').insert(scheme)
+  return PostId(scheme_id)
 }
 
-function addStep(scheme_id, step) { // EXERCISE E
+async function PostId(scheme_id) {
+  return db('schemes').where({scheme_id}).first()
+}
+
+async function addStep(scheme_id, step) { // EXERCISE E
   /*
     1E- This function adds a step to the scheme with the given `scheme_id`
     and resolves to _all the steps_ belonging to the given `scheme_id`,
     including the newly created one.
   */
+ await db('steps').insert({scheme_id: scheme_id, ...step})
+ return findSteps(scheme_id)
 }
 
 module.exports = {
